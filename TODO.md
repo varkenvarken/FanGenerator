@@ -1,4 +1,4 @@
 - [ ] fix tip camber (or remove it)
-- [ ] add bevels to all knobs
+- [x] add bevels to all knobs
 - [ ] add proper icon to menu entry
 - [x] group all generated objects into a collection

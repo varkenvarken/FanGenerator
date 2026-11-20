@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Table Fan Generator",
     "author": "Michel Anders",
-    "version": (0, 0, 20261120032312),
+    "version": (0, 0, 20261120032826),
     "blender": (5, 3, 0),
     "location": "View3D > Add > Mesh > Parametric Axial Fan",
     "description": "Generates a multi-blade NURBS axial fan with protective spiral/concentric cage, desk stand, PBR materials, and cyclic animation",
@@ -360,6 +360,9 @@ def build_stand_and_motor(
     )
     knob_obj = context.active_object
     knob_obj.name = f"{name}_OscillationKnob"
+    bevel = knob_obj.modifiers.new(name="KnobBevel", type="BEVEL")
+    bevel.width = 0.001
+    bevel.segments = 2
     for poly in knob_obj.data.polygons:
         poly.use_smooth = True
     created_parts.append(knob_obj)
@@ -438,6 +441,9 @@ def build_stand_and_motor(
         btn.name = f"{name}_SpeedButton_{i}"
         btn.scale = (btn_spacing * 0.55, btn_spacing * 0.85, btn_h)
         bpy.ops.object.transform_apply(scale=True)
+        bevel = btn.modifiers.new(name="ButtonBevel", type="BEVEL")
+        bevel.width = 0.001
+        bevel.segments = 2
         created_parts.append(btn)
 
     return head_pivot, motor_obj, knob_obj, upper_neck, column_obj, base_obj, created_parts
