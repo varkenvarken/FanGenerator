@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Table Fan Generator",
     "author": "Michel Anders",
-    "version": (0, 0, 20261120024043),
+    "version": (0, 0, 20261120032312),
     "blender": (5, 3, 0),
     "location": "View3D > Add > Mesh > Parametric Axial Fan",
     "description": "Generates a multi-blade NURBS axial fan with protective spiral/concentric cage, desk stand, PBR materials, and cyclic animation",
@@ -1008,6 +1008,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
                     box_anim.prop(self, "oscillation_period")
 
     def execute(self, context):
+        existing_objects = set(bpy.data.objects)
         n_blades = int(self.blade_count)
         r_tip = self.fan_diameter * 0.5
         r_hub = min(self.hub_diameter * 0.5, r_tip * 0.85)
@@ -1175,6 +1176,14 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
                 osc_angle_deg=self.oscillation_angle,
                 osc_period_sec=self.oscillation_period,
             )
+
+        fan_collection = bpy.data.collections.new(f"Axial Fan ({n_blades} Blades)")
+        context.scene.collection.children.link(fan_collection)
+        for obj in bpy.data.objects:
+            if obj not in existing_objects:
+                for collection in tuple(obj.users_collection):
+                    collection.objects.unlink(obj)
+                fan_collection.objects.link(obj)
 
         bpy.ops.object.select_all(action="DESELECT")
         root_empty.select_set(True)
