@@ -645,6 +645,10 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
     bl_label = "Parametric Axial Fan"
     bl_options = {"REGISTER", "UNDO"}
 
+    @classmethod
+    def poll(cls, context):
+        return context.mode == "OBJECT"
+
     # --- Rotor & Hub Dimensions ---
     blade_count: EnumProperty(
         name="Blades",
