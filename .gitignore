@@ -1,1 +1,2 @@
 Tests/*.blend
+code/__pycache__/*

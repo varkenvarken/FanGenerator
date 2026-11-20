@@ -1,18 +1,41 @@
 bl_info = {
     "name": "Table Fan Generator",
     "author": "Michel Anders",
-    "version": (0, 0, 20261120032826),
+    "version": (0, 0, 20261120034127),
     "blender": (5, 3, 0),
     "location": "View3D > Add > Mesh > Parametric Axial Fan",
     "description": "Generates a multi-blade NURBS axial fan with protective spiral/concentric cage, desk stand, PBR materials, and cyclic animation",
     "category": "Add Mesh",
 }
 
+import base64
 import math
+import os
+import tempfile
 
 import bpy
+import bpy.utils.previews
 import numpy as np
 from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty
+
+_FAN_ICON_PNG_BASE64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAC4ElEQVR42tWXT4hOURjGf/fON+Vf"
+    "siCRjEjMZEVKmQ1RSmkyKNkQG6NEbCyULGU3EilDWVFKKJPSLEbGhqIUZuFP0/zzLQwzw8z33Wvz"
+    "HL1u9373O9csOHU697v3nPe853mf9znvB/9BCzUGwF7gNtAPjAOTwGfgEXASaDLrGmZy8xVADxDn"
+    "9C9AJ7BsJpwI1RcC77VBBagCkdk00ruqeTcMbEkcwrs572/K6M86EIiAKT2PAWsVurAo9GvMqWOP"
+    "Pq2xuygKJY2nEgZ9ugvVulpOZHkWa2z+Cw5Fgn9TEQdmqsXA7HpinWyBxgGDhu/Gzs4zg4g3B9pM"
+    "+vnE3nHmWlGkHQILgJGUPM9jfwxc0UFCY6+ujRvUG/XudB06EBkH+4F9RktcL+U5kiabjVp4T8an"
+    "jAo6qO2prwq1vH2CJNShDC8CNsj4K0kqwFzgBrDHEMrGdRjoAO7q93Zgq9J4FvAJ6AUeAmWzd2xP"
+    "flSG3GnKIlGL2eiEOBEDfcAx4CLwFJgH7Ade1gjVIHDWhPc3Eh1mUlJ6x4FL0nUkLD2S6U7giJAZ"
+    "ScmEivp0IpO6gTkOxRbgRwrTo8SiSaBLcT4I3DHftgHPtWY6h6yOzF3u9Ndzcj1K+dYBnNfzd2Cj"
+    "OBN7puuOQGq3JBmTDHWrCLZBoB1YJehbgXMp5MxqVc17HJhLw0dmA4XtgRBoFwnxtDWGKSB8ugvJ"
+    "ADBfZCxybVdDk5dxgQtnUKf4WPCyGgpV7xVxIAC+aSx7wu/UtC8EnhRwwEH41mSCr/OBS8VmESoq"
+    "wAEnzTs9rm03p9feP7c8SORqvQ+G+a1GM/LWOpVcb+FoAr5miE5WsbHbQLoUmEj5z5A8uft2yN7A"
+    "DoZdGZPT1PCMMeCE576pG6JEnVAxdg8nqq4/aoE2YLQGAkPAgcQaV/GsBN7VWPsC2Jy2edKJ1cBl"
+    "GZtQqr0GLgDLM4oXl36LdT2/0bpRke24qY5L/9Rf71/s67USYm637gAAAABJRU5ErkJggg=="
+)
+_preview_collections = {}
+_preview_icon_tempdir = None
 
 # ==============================================================================
 # 1. NURBS BLADE & CENTRAL HUB BUILDERS
@@ -1202,16 +1225,33 @@ def menu_func(self, context):
     self.layout.operator(
         MESH_OT_add_parametric_fan.bl_idname,
         text="Parametric Desktop Fan",
-        icon="FORCE_WIND",
+        icon_value=_preview_collections["main"]["fan"].icon_id,
     )
 
 
 def register():
+    global _preview_icon_tempdir
+
     bpy.utils.register_class(MESH_OT_add_parametric_fan)
+    preview_collection = bpy.utils.previews.new()
+    _preview_icon_tempdir = tempfile.TemporaryDirectory()
+    icon_path = os.path.join(_preview_icon_tempdir.name, "fan.png")
+    with open(icon_path, "wb") as icon_file:
+        icon_file.write(base64.b64decode(_FAN_ICON_PNG_BASE64))
+    preview_collection.load("fan", icon_path, "IMAGE")
+    _preview_collections["main"] = preview_collection
     bpy.types.VIEW3D_MT_mesh_add.append(menu_func)
 
 
 def unregister():
+    global _preview_icon_tempdir
+
     bpy.types.VIEW3D_MT_mesh_add.remove(menu_func)
     bpy.utils.unregister_class(MESH_OT_add_parametric_fan)
+    for preview_collection in _preview_collections.values():
+        bpy.utils.previews.remove(preview_collection)
+    _preview_collections.clear()
+    if _preview_icon_tempdir is not None:
+        _preview_icon_tempdir.cleanup()
+        _preview_icon_tempdir = None
 
