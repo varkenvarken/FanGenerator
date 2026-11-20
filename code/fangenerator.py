@@ -1185,8 +1185,8 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
 def menu_func(self, context):
     self.layout.operator(
         MESH_OT_add_parametric_fan.bl_idname,
-        text="Parametric Axial Fan",
-        icon="FORCE_VORTEX",
+        text="Parametric Desktop Fan",
+        icon="FORCE_WIND",
     )
 
 
