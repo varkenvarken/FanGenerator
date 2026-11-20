@@ -337,11 +337,13 @@ def build_stand_and_motor(
         if poly.normal.y > 0.9:
             poly.select = True
     bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.bevel(
-        offset=min(motor_radius * 0.45, motor_length * 0.4),
-        segments=6,
-        affect="EDGES",
-    )
+    # bpy.ops.mesh.select_mode(type='FACE')
+    # note sure what was the intention of this, but it doesn bevel anything properly
+    # bpy.ops.mesh.bevel(
+    #     offset=min(motor_radius * 0.45, motor_length * 0.4),
+    #     segments=6,
+    #     affect="EDGES",
+    # )
     bpy.ops.object.mode_set(mode="OBJECT")
     for poly in motor_obj.data.polygons:
         poly.use_smooth = True
@@ -552,6 +554,25 @@ def assign_material(obj, mat):
         obj.data.materials[0] = mat
 
 
+def _iter_action_fcurves(animated_object):
+    animation_data = animated_object.animation_data
+    if animation_data is None or animation_data.action is None:
+        return
+
+    action = animation_data.action
+    if hasattr(action, "fcurves"):
+        yield from action.fcurves
+        return
+
+    for layer in action.layers:
+        for strip in layer.strips:
+            if strip.type != "KEYFRAME":
+                continue
+            channelbag = strip.channelbag(animation_data.action_slot)
+            if channelbag is not None:
+                yield from channelbag.fcurves
+
+
 def setup_fan_animation(
     context,
     rotor_empty,
@@ -576,14 +597,13 @@ def setup_fan_animation(
     rotor_empty.rotation_euler = (0.0, 0.0, -2.0 * math.pi)
     rotor_empty.keyframe_insert(data_path="rotation_euler", index=2, frame=1 + frames_per_rev)
 
-    if rotor_empty.animation_data and rotor_empty.animation_data.action:
-        for fcurve in rotor_empty.animation_data.action.fcurves:
-            if fcurve.data_path == "rotation_euler" and fcurve.array_index == 2:
-                for kp in fcurve.keyframe_points:
-                    kp.interpolation = "LINEAR"
-                mod = fcurve.modifiers.new(type="CYCLES")
-                mod.mode_before = "REPEAT_OFFSET"
-                mod.mode_after = "REPEAT_OFFSET"
+    for fcurve in _iter_action_fcurves(rotor_empty):
+        if fcurve.data_path == "rotation_euler" and fcurve.array_index == 2:
+            for kp in fcurve.keyframe_points:
+                kp.interpolation = "LINEAR"
+            mod = fcurve.modifiers.new(type="CYCLES")
+            mod.mode_before = "REPEAT_OFFSET"
+            mod.mode_after = "REPEAT_OFFSET"
 
     # 2. Smooth Head Oscillation (around Z yaw axis)
     if oscillate and head_pivot is not None:
@@ -603,16 +623,15 @@ def setup_fan_animation(
             head_pivot.rotation_euler = (tilt_x, 0.0, yaw_z)
             head_pivot.keyframe_insert(data_path="rotation_euler", index=2, frame=frame_num)
 
-        if head_pivot.animation_data and head_pivot.animation_data.action:
-            for fcurve in head_pivot.animation_data.action.fcurves:
-                if fcurve.data_path == "rotation_euler" and fcurve.array_index == 2:
-                    for kp in fcurve.keyframe_points:
-                        kp.interpolation = "BEZIER"
-                        kp.handle_left_type = "AUTO_CLAMPED"
-                        kp.handle_right_type = "AUTO_CLAMPED"
-                    mod = fcurve.modifiers.new(type="CYCLES")
-                    mod.mode_before = "REPEAT"
-                    mod.mode_after = "REPEAT"
+        for fcurve in _iter_action_fcurves(head_pivot):
+            if fcurve.data_path == "rotation_euler" and fcurve.array_index == 2:
+                for kp in fcurve.keyframe_points:
+                    kp.interpolation = "BEZIER"
+                    kp.handle_left_type = "AUTO_CLAMPED"
+                    kp.handle_right_type = "AUTO_CLAMPED"
+                mod = fcurve.modifiers.new(type="CYCLES")
+                mod.mode_before = "REPEAT"
+                mod.mode_after = "REPEAT"
 
 
 # ==============================================================================
