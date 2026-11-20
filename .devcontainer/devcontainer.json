@@ -1,0 +1,22 @@
+// For format details, see https://aka.ms/devcontainer.json.
+{
+	"name": "Python 3.13",
+	"image": "mcr.microsoft.com/devcontainers/python:1-3.13-bookworm",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"jsynowiec.vscode-insertdatestring",
+				"bierner.markdown-mermaid",
+				"ms-python.vscode-pylance",
+				"ms-python.python",
+				"ms-python.debugpy",
+				"yzhang.markdown-all-in-one",
+				"bierner.markdown-checkbox",
+				"charliermarsh.ruff",
+				"ritwickdey.LiveServer",
+				"yzane.markdown-pdf"
+			]
+		}
+	},
+	"postCreateCommand": "sudo rm -f /etc/apt/sources.list.d/yarn.list && sudo apt-get update && sudo apt-get install -y libxkbcommon-x11-0 libsm6 libxrender1 libfontconfig1 ffmpeg libxext6 && python -m pip install -r requirements.txt"
+}
