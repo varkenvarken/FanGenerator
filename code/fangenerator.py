@@ -448,11 +448,12 @@ def build_stand_and_motor(
 # ==============================================================================
 
 def _set_bsdf_input(bsdf, names, value):
-    """Safely set a Principled BSDF input across Blender 3.x and 4.x+ socket names."""
+    """Safely set a Principled BSDF input."""
     for n in names:
         if n in bsdf.inputs:
             bsdf.inputs[n].default_value = value
-            return
+            return True
+    return False
 
 
 def create_fan_materials(preset="CLASSIC_WHITE"):
