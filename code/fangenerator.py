@@ -1199,6 +1199,3 @@ def unregister():
     bpy.types.VIEW3D_MT_mesh_add.remove(menu_func)
     bpy.utils.unregister_class(MESH_OT_add_parametric_fan)
 
-
-if __name__ == "__main__":
-    register()
