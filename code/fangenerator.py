@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Table Fan Generator",
     "author": "Michel Anders",
-    "version": (0, 0, 20261120015050),
+    "version": (0, 0, 20261120024043),
     "blender": (5, 3, 0),
     "location": "View3D > Add > Mesh > Parametric Axial Fan",
     "description": "Generates a multi-blade NURBS axial fan with protective spiral/concentric cage, desk stand, PBR materials, and cyclic animation",
@@ -333,17 +333,17 @@ def build_stand_and_motor(
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="DESELECT")
     bpy.ops.object.mode_set(mode="OBJECT")
+    # select the ngons (i.e. the caps of the cylinder)
     for poly in motor_obj.data.polygons:
-        if poly.normal.y > 0.9:
+        if poly.loop_total > 4:
             poly.select = True
     bpy.ops.object.mode_set(mode="EDIT")
     # bpy.ops.mesh.select_mode(type='FACE')
-    # note sure what was the intention of this, but it doesn bevel anything properly
-    # bpy.ops.mesh.bevel(
-    #     offset=min(motor_radius * 0.45, motor_length * 0.4),
-    #     segments=6,
-    #     affect="EDGES",
-    # )
+    bpy.ops.mesh.bevel(
+        offset=min(motor_radius * 0.1, motor_length * 0.1),
+        segments=6,
+        affect="EDGES",
+    )
     bpy.ops.object.mode_set(mode="OBJECT")
     for poly in motor_obj.data.polygons:
         poly.use_smooth = True
