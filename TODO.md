@@ -1,4 +1,9 @@
-- [ ] fix tip camber (or remove it)
+- [x] fix tip camber (or remove it)
 - [x] add bevels to all knobs
-- [ ] add proper icon to menu entry
+- [x] add proper icon to menu entry
 - [x] group all generated objects into a collection
+- [ ] remove unnecessary geometry (like caps on cylinders)
+- [ ] change bevel to bevel modifier on motor housing
+- [ ] make NURBS resolution a parameter
+- [ ] docs
+- [ ] add text option to brand plate

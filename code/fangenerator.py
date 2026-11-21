@@ -1,22 +1,21 @@
+from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty
+import numpy as np
+import bpy.utils.previews
+import bpy
+import tempfile
+import os
+import math
+import base64
 bl_info = {
     "name": "Table Fan Generator",
     "author": "Michel Anders",
-    "version": (0, 0, 20261120034127),
+    "version": (0, 0, 20261121023252),
     "blender": (5, 3, 0),
     "location": "View3D > Add > Mesh > Parametric Axial Fan",
     "description": "Generates a multi-blade NURBS axial fan with protective spiral/concentric cage, desk stand, PBR materials, and cyclic animation",
     "category": "Add Mesh",
 }
 
-import base64
-import math
-import os
-import tempfile
-
-import bpy
-import bpy.utils.previews
-import numpy as np
-from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty
 
 _FAN_ICON_PNG_BASE64 = (
     "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAC4ElEQVR42tWXT4hOURjGf/fON+Vf"
@@ -40,6 +39,7 @@ _preview_icon_tempdir = None
 # ==============================================================================
 # 1. NURBS BLADE & CENTRAL HUB BUILDERS
 # ==============================================================================
+
 
 def build_nurbs_blade(
     context,
@@ -78,7 +78,9 @@ def build_nurbs_blade(
         spline.points.add(n_v - 1)
 
         for j, v in enumerate(v_vals):
-            z_camber = camber * (1.0 - 4.0 * v**2)
+            tip_t = min(1.0, max(0.0, (1.0 - u) / 0.15))
+            tip_fade = tip_t**2 * (3.0 - 2.0 * tip_t)
+            z_camber = camber * (1.0 - 4.0 * v**2) * tip_fade
             s_local = v * chord * np.cos(beta) - z_camber * np.sin(beta)
             z_local = v * chord * np.sin(beta) + z_camber * np.cos(beta)
 
@@ -206,7 +208,8 @@ def build_protective_cage(
             )
 
         if grille_style == "CONCENTRIC":
-            ring_radii = np.linspace(r_inner, r_outer, num_rings, endpoint=False)
+            ring_radii = np.linspace(
+                r_inner, r_outer, num_rings, endpoint=False)
             for rr in ring_radii:
                 spline = curve_data.splines.new(type="POLY")
                 spline.use_cyclic_u = True
@@ -550,7 +553,8 @@ def create_fan_materials(preset="CLASSIC_WHITE"):
     _set_bsdf_input(bsdf_blade, ["Base Color"], cfg["blade_color"])
     _set_bsdf_input(bsdf_blade, ["Roughness"], cfg["blade_roughness"])
     _set_bsdf_input(bsdf_blade, ["IOR"], 1.49)
-    _set_bsdf_input(bsdf_blade, ["Transmission Weight", "Transmission"], cfg["blade_transmission"])
+    _set_bsdf_input(
+        bsdf_blade, ["Transmission Weight", "Transmission"], cfg["blade_transmission"])
     _set_bsdf_input(bsdf_blade, ["Coat Weight", "Clearcoat"], 0.35)
 
     mat_metal, bsdf_metal = get_or_create_mat(f"FanMat_MetalGrille_{preset}")
@@ -625,7 +629,8 @@ def setup_fan_animation(
     rotor_empty.keyframe_insert(data_path="rotation_euler", index=2, frame=1)
 
     rotor_empty.rotation_euler = (0.0, 0.0, -2.0 * math.pi)
-    rotor_empty.keyframe_insert(data_path="rotation_euler", index=2, frame=1 + frames_per_rev)
+    rotor_empty.keyframe_insert(
+        data_path="rotation_euler", index=2, frame=1 + frames_per_rev)
 
     for fcurve in _iter_action_fcurves(rotor_empty):
         if fcurve.data_path == "rotation_euler" and fcurve.array_index == 2:
@@ -651,7 +656,8 @@ def setup_fan_animation(
 
         for frame_num, yaw_z in keyframes:
             head_pivot.rotation_euler = (tilt_x, 0.0, yaw_z)
-            head_pivot.keyframe_insert(data_path="rotation_euler", index=2, frame=frame_num)
+            head_pivot.keyframe_insert(
+                data_path="rotation_euler", index=2, frame=frame_num)
 
         for fcurve in _iter_action_fcurves(head_pivot):
             if fcurve.data_path == "rotation_euler" and fcurve.array_index == 2:
@@ -689,7 +695,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
             ("5", "5 Blades", "5-blade quiet rotor"),
         ],
         default="3",
-    ) # type: ignore
+    )  # type: ignore
 
     fan_diameter: FloatProperty(
         name="Fan Diameter",
@@ -698,7 +704,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         min=0.05,
         max=5.0,
         unit="LENGTH",
-    ) # type: ignore
+    )  # type: ignore
 
     hub_diameter: FloatProperty(
         name="Hub Diameter",
@@ -707,7 +713,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         min=0.01,
         max=2.5,
         unit="LENGTH",
-    ) # type: ignore
+    )  # type: ignore
 
     hub_height: FloatProperty(
         name="Hub Height",
@@ -716,7 +722,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         min=0.005,
         max=1.0,
         unit="LENGTH",
-    ) # type: ignore
+    )  # type: ignore
 
     # --- Blade Geometry ---
     beta_hub: FloatProperty(
@@ -725,7 +731,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         default=42.0,
         min=5.0,
         max=75.0,
-    ) # type: ignore
+    )  # type: ignore
 
     beta_tip: FloatProperty(
         name="Tip Pitch (deg)",
@@ -733,7 +739,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         default=18.0,
         min=2.0,
         max=60.0,
-    ) # type: ignore
+    )  # type: ignore
 
     chord_ratio: FloatProperty(
         name="Blade Width Scale",
@@ -741,16 +747,46 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         default=1.0,
         min=0.3,
         max=2.5,
+    )  # type: ignore
+
+    # getter/setter needed to reduce increments/decrements to 1/1000
+    def get_camber(self):
+        # Default is 0.002 (2 thousandths)
+        steps = self.get("_camber_steps", 2)
+        return round(steps * 0.001, 3)
+
+
+    def set_camber(self, value):
+        # Clamp to [0.0, 0.05] and snap to nearest 0.001 step (0..50)
+        clamped = max(0.0, min(0.05, float(value)))
+        steps = round(clamped * 1000.0)
+        self["_camber_steps"] = max(0, min(50, steps))
+
+
+    camber_steps: IntProperty(
+        name="Blade Cupping (Camber)",
+        description="Parabolic camber depth across blade chord in 0.001 m steps (0 to 50 -> 0.000 to 0.050 m)",
+        default=2,  # 0.002 m
+        min=0,
+        max=50,  # 0.050 m
     ) # type: ignore
 
-    camber: FloatProperty(
-        name="Blade Cupping (Camber)",
-        description="Parabolic camber depth across blade chord",
-        default=0.008,
-        min=0.0,
-        max=0.05,
-        unit="LENGTH",
-    ) # type: ignore
+    @property
+    def camber(self) -> float:
+        return round(self.camber_steps * 0.001, 3)
+    
+    # camber: FloatProperty(
+    #     name="Blade Cupping (Camber)",
+    #     description="Parabolic camber depth across blade chord",
+    #     default=0.002,
+    #     min=0.0,
+    #     max=0.05,
+    #     step=1,
+    #     precision=3,
+    #     # unit="LENGTH",
+    #     get=get_camber,
+    #     set=set_camber,
+    # ) # type: ignore
 
     sweep_deg: FloatProperty(
         name="Sweep Angle (deg)",
@@ -758,7 +794,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         default=15.0,
         min=-45.0,
         max=45.0,
-    ) # type: ignore
+    )  # type: ignore
 
     blade_thickness: FloatProperty(
         name="Blade Thickness",
@@ -767,20 +803,20 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         min=0.0,
         max=0.02,
         unit="LENGTH",
-    ) # type: ignore
+    )  # type: ignore
 
     convert_to_mesh: BoolProperty(
         name="Convert Blades to Mesh",
         description="Keep blades as live NURBS surfaces or convert to polygon meshes",
         default=False,
-    ) # type: ignore
+    )  # type: ignore
 
     # --- Protective Cage / Shroud Settings ---
     include_cage: BoolProperty(
         name="Include Protective Cage",
         description="Generate a protective front/rear wire grille and outer shroud rim",
         default=True,
-    ) # type: ignore
+    )  # type: ignore
 
     grille_style: EnumProperty(
         name="Grille Style",
@@ -790,7 +826,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
             ("CONCENTRIC", "Concentric Rings", "Classic parallel circular rings"),
         ],
         default="SPIRAL",
-    ) # type: ignore
+    )  # type: ignore
 
     tip_clearance: FloatProperty(
         name="Cage Tip Clearance",
@@ -799,7 +835,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         min=0.002,
         max=0.25,
         unit="LENGTH",
-    ) # type: ignore
+    )  # type: ignore
 
     cage_depth: FloatProperty(
         name="Cage Axial Depth",
@@ -808,7 +844,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         min=0.02,
         max=1.0,
         unit="LENGTH",
-    ) # type: ignore
+    )  # type: ignore
 
     cage_dome: FloatProperty(
         name="Cage Dome Bulge",
@@ -817,7 +853,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         min=0.0,
         max=0.25,
         unit="LENGTH",
-    ) # type: ignore
+    )  # type: ignore
 
     cage_spokes: IntProperty(
         name="Radial Spokes",
@@ -825,7 +861,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         default=12,
         min=4,
         max=48,
-    ) # type: ignore
+    )  # type: ignore
 
     cage_rings: IntProperty(
         name="Concentric Rings",
@@ -833,7 +869,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         default=14,
         min=3,
         max=60,
-    ) # type: ignore
+    )  # type: ignore
 
     spiral_turns: FloatProperty(
         name="Spiral Turns",
@@ -841,7 +877,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         default=12.0,
         min=2.0,
         max=50.0,
-    ) # type: ignore
+    )  # type: ignore
 
     spiral_twist_deg: FloatProperty(
         name="Spoke Twist (deg)",
@@ -849,7 +885,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         default=35.0,
         min=-120.0,
         max=120.0,
-    ) # type: ignore
+    )  # type: ignore
 
     wire_diameter: FloatProperty(
         name="Wire Diameter",
@@ -858,7 +894,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         min=0.0005,
         max=0.02,
         unit="LENGTH",
-    ) # type: ignore
+    )  # type: ignore
 
     rim_width: FloatProperty(
         name="Shroud Rim Width",
@@ -867,14 +903,14 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         min=0.002,
         max=0.3,
         unit="LENGTH",
-    ) # type: ignore
+    )  # type: ignore
 
     # --- Desk Stand & Motor Housing Settings ---
     include_stand: BoolProperty(
         name="Include Desk Stand & Motor",
         description="Add rear motor pod, tilt neck, and weighted table base",
         default=True,
-    ) # type: ignore
+    )  # type: ignore
 
     motor_length: FloatProperty(
         name="Motor Housing Length",
@@ -883,7 +919,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         min=0.02,
         max=0.6,
         unit="LENGTH",
-    ) # type: ignore
+    )  # type: ignore
 
     stand_height: FloatProperty(
         name="Center-to-Desk Height",
@@ -892,7 +928,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         min=0.10,
         max=2.0,
         unit="LENGTH",
-    ) # type: ignore
+    )  # type: ignore
 
     base_diameter: FloatProperty(
         name="Base Diameter",
@@ -901,7 +937,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         min=0.06,
         max=1.5,
         unit="LENGTH",
-    ) # type: ignore
+    )  # type: ignore
 
     base_height: FloatProperty(
         name="Base Thickness",
@@ -910,7 +946,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         min=0.005,
         max=0.2,
         unit="LENGTH",
-    ) # type: ignore
+    )  # type: ignore
 
     tilt_angle: FloatProperty(
         name="Head Tilt Angle (deg)",
@@ -918,33 +954,37 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         default=8.0,
         min=-30.0,
         max=45.0,
-    ) # type: ignore
+    )  # type: ignore
 
     # --- PBR Material Settings ---
     assign_materials: BoolProperty(
         name="Auto-Assign PBR Materials",
         description="Assign realistic Principled BSDF materials to all fan components",
         default=True,
-    ) # type: ignore
+    )  # type: ignore
 
     material_preset: EnumProperty(
         name="Color Theme",
         description="Preconfigured material and finish palette",
         items=[
-            ("CLASSIC_WHITE", "Classic White & Chrome", "White ABS housing, chrome grille, translucent ice blades"),
-            ("RETRO_TEAL", "Retro Teal & Brass", "Vintage teal enamel body, brushed brass grille, cream blades"),
-            ("MATTE_BLACK", "Stealth Matte Black", "Matte black housing, gunmetal grille, red accent buttons"),
-            ("SMOKED_BLUE", "Smoked Translucent Blue", "Dark charcoal housing, chrome grille, deep blue acrylic blades"),
+            ("CLASSIC_WHITE", "Classic White & Chrome",
+             "White ABS housing, chrome grille, translucent ice blades"),
+            ("RETRO_TEAL", "Retro Teal & Brass",
+             "Vintage teal enamel body, brushed brass grille, cream blades"),
+            ("MATTE_BLACK", "Stealth Matte Black",
+             "Matte black housing, gunmetal grille, red accent buttons"),
+            ("SMOKED_BLUE", "Smoked Translucent Blue",
+             "Dark charcoal housing, chrome grille, deep blue acrylic blades"),
         ],
         default="CLASSIC_WHITE",
-    ) # type: ignore
+    )  # type: ignore
 
     # --- Animation Settings ---
     animate_fan: BoolProperty(
         name="Enable Spin & Oscillation Animation",
         description="Keyframes continuous rotor spin and cyclic head oscillation",
         default=False,
-    ) # type: ignore
+    )  # type: ignore
 
     fan_rpm: FloatProperty(
         name="Rotor Speed (RPM)",
@@ -952,13 +992,13 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         default=180.0,
         min=10.0,
         max=3000.0,
-    ) # type: ignore
+    )  # type: ignore
 
     enable_oscillation: BoolProperty(
         name="Oscillate Head",
         description="Sweep the fan head side-to-side smoothly",
         default=True,
-    ) # type: ignore
+    )  # type: ignore
 
     oscillation_angle: FloatProperty(
         name="Oscillation Sweep (deg)",
@@ -966,7 +1006,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         default=50.0,
         min=10.0,
         max=140.0,
-    ) # type: ignore
+    )  # type: ignore
 
     oscillation_period: FloatProperty(
         name="Oscillation Cycle (sec)",
@@ -974,7 +1014,7 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         default=6.0,
         min=1.0,
         max=30.0,
-    ) # type: ignore
+    )  # type: ignore
 
     def draw(self, context):
         layout = self.layout
@@ -991,7 +1031,8 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         box_aero.prop(self, "beta_hub")
         box_aero.prop(self, "beta_tip")
         box_aero.prop(self, "chord_ratio")
-        box_aero.prop(self, "camber")
+        # box_aero.prop(self, "camber")
+        box_aero.prop(self, "camber_steps")
         box_aero.prop(self, "sweep_deg")
         box_aero.prop(self, "blade_thickness")
         box_aero.prop(self, "convert_to_mesh")
@@ -1138,8 +1179,10 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
 
             r_cage = r_tip + self.tip_clearance
             z_half = max(self.cage_depth * 0.5, self.hub_height * 0.55)
-            z_rear_cage = z_half + (self.cage_dome if self.include_cage else 0.0)
-            eff_stand_height = max(self.stand_height, r_cage + self.base_height + 0.015)
+            z_rear_cage = z_half + \
+                (self.cage_dome if self.include_cage else 0.0)
+            eff_stand_height = max(
+                self.stand_height, r_cage + self.base_height + 0.015)
 
             (
                 head_pivot,
@@ -1206,7 +1249,8 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
                 osc_period_sec=self.oscillation_period,
             )
 
-        fan_collection = bpy.data.collections.new(f"Axial Fan ({n_blades} Blades)")
+        fan_collection = bpy.data.collections.new(
+            f"Axial Fan ({n_blades} Blades)")
         context.scene.collection.children.link(fan_collection)
         for obj in bpy.data.objects:
             if obj not in existing_objects:
@@ -1254,4 +1298,3 @@ def unregister():
     if _preview_icon_tempdir is not None:
         _preview_icon_tempdir.cleanup()
         _preview_icon_tempdir = None
-
