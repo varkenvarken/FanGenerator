@@ -1,4 +1,10 @@
-from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty
+from bpy.props import (
+    BoolProperty,
+    EnumProperty,
+    FloatProperty,
+    IntProperty,
+    StringProperty,
+)
 import numpy as np
 import bpy.utils.previews
 import bpy
@@ -9,7 +15,7 @@ import base64
 bl_info = {
     "name": "Table Fan Generator",
     "author": "Michel Anders",
-    "version": (0, 0, 20261121024556),
+    "version": (0, 0, 20261121025615),
     "blender": (5, 3, 0),
     "location": "View3D > Add > Mesh > Parametric Axial Fan",
     "description": "Generates a multi-blade desktop fan with protective spiral/concentric cage, desk stand, PBR materials, and cyclic animation",
@@ -122,7 +128,12 @@ def build_nurbs_blade(
     return blade_obj
 
 
-def build_central_hub(context, name, r_hub, hub_height):
+def build_central_hub(
+    context,
+    name,
+    r_hub,
+    hub_height,
+):
     bpy.ops.mesh.primitive_cylinder_add(
         vertices=48,
         radius=r_hub,
@@ -133,21 +144,25 @@ def build_central_hub(context, name, r_hub, hub_height):
     hub_obj = context.active_object
     hub_obj.name = name
 
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_all(action="DESELECT")
-    bpy.ops.object.mode_set(mode="OBJECT")
-
-    for poly in hub_obj.data.polygons:
-        if poly.normal.z > 0.9:
-            poly.select = True
-
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.bevel(
-        offset=min(r_hub * 0.28, hub_height * 0.35),
-        segments=5,
-        affect="EDGES",
+    bevel_weights = hub_obj.data.attributes.new(
+        name="bevel_weight_edge",
+        type="FLOAT",
+        domain="EDGE",
     )
-    bpy.ops.object.mode_set(mode="OBJECT")
+    for edge in hub_obj.data.edges:
+        vertex_a = hub_obj.data.vertices[edge.vertices[0]]
+        vertex_b = hub_obj.data.vertices[edge.vertices[1]]
+        at_end_rim = (
+            abs(vertex_a.co.z - vertex_b.co.z) <= 1e-5
+            and abs(abs(vertex_a.co.z) - hub_height * 0.5) <= 1e-5
+        )
+        if at_end_rim:
+            bevel_weights.data[edge.index].value = 1.0
+
+    bevel = hub_obj.modifiers.new(name="HubEndBevel", type="BEVEL")
+    bevel.width = min(r_hub * 0.28, hub_height * 0.35)
+    bevel.segments = 5
+    bevel.limit_method = "WEIGHT"
 
     for poly in hub_obj.data.polygons:
         poly.use_smooth = True
@@ -173,6 +188,9 @@ def build_protective_cage(
     spiral_twist_deg,
     wire_radius,
     rim_width,
+    brand_name="",
+    brand_font_path="",
+    brand_font_size=0.012,
 ):
     """Build a beveled curve wire cage (concentric or spiral) and solid outer rim band."""
     curve_data = bpy.data.curves.new(name=f"{name}_WireCurve", type="CURVE")
@@ -306,8 +324,62 @@ def build_protective_cage(
     )
     badge_obj = context.active_object
     badge_obj.name = f"{name}_CenterBadge"
+
+    if brand_name:
+        badge_depth = wire_radius * 2.5
+        engraving_depth = min(0.001, badge_depth * 0.35)
+        text_data = bpy.data.curves.new(
+            name=f"{name}_BrandText",
+            type="FONT",
+        )
+        text_data.body = brand_name
+        text_data.align_x = "CENTER"
+        text_data.align_y = "CENTER"
+        text_data.size = brand_font_size
+        text_data.extrude = engraving_depth * 2.0
+
+        default_font = bpy.data.fonts.get("Bfont")
+        if default_font is not None:
+            text_data.font = default_font
+
+        resolved_font_path = (
+            bpy.path.abspath(brand_font_path) if brand_font_path else ""
+        )
+        if resolved_font_path and os.path.isfile(resolved_font_path):
+            text_data.font = bpy.data.fonts.load(
+                resolved_font_path,
+                check_existing=True,
+            )
+
+        text_obj = bpy.data.objects.new(f"{name}_BrandCutter", text_data)
+        context.collection.objects.link(text_obj)
+        text_obj.location.z = z_front_center + badge_depth * 0.5 - engraving_depth
+
+        bpy.ops.object.select_all(action="DESELECT")
+        text_obj.select_set(True)
+        context.view_layer.objects.active = text_obj
+        bpy.ops.object.convert(target="MESH")
+        text_obj = context.view_layer.objects.active
+
+        boolean = badge_obj.modifiers.new(
+            name="BrandEngraving", type="BOOLEAN")
+        boolean.operation = "DIFFERENCE"
+        boolean.solver = "EXACT"
+        boolean.object = text_obj
+
+        bpy.ops.object.select_all(action="DESELECT")
+        badge_obj.select_set(True)
+        context.view_layer.objects.active = badge_obj
+        bpy.ops.object.modifier_apply(modifier=boolean.name)
+        bpy.data.objects.remove(text_obj, do_unlink=True)
+
     for poly in badge_obj.data.polygons:
         poly.use_smooth = True
+
+    bpy.ops.object.select_all(action="DESELECT")
+    badge_obj.select_set(True)
+    context.view_layer.objects.active = badge_obj
+    bpy.ops.object.shade_auto_smooth()
 
     return wire_obj, rim_obj, badge_obj
 
@@ -725,6 +797,40 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         unit="LENGTH",
     )  # type: ignore
 
+    brand_name: StringProperty(
+        name="Brand Name",
+        description="Engrave this text into the cage center badge",
+        default="Acme",
+    )  # type: ignore
+
+    brand_font: EnumProperty(
+        name="Brand Font",
+        description="Font used for the engraved brand name",
+        items=[
+            ("BLENDER_DEFAULT", "Blender Default", "Use Blender's built-in font"),
+            ("CUSTOM", "Custom Font File", "Load a custom font file"),
+        ],
+        default="BLENDER_DEFAULT",
+    )  # type: ignore
+
+    brand_font_file: StringProperty(
+        name="Font File",
+        description="Font file used for the engraved brand name",
+        subtype="FILE_PATH",
+        default="",
+    )  # type: ignore
+
+    brand_font_size: FloatProperty(
+        name="Brand Font Size",
+        description="Height of the engraved brand text",
+        default=0.012,
+        min=0.001,
+        max=0.1,
+        step=1,
+        precision=3,
+        unit="LENGTH",
+    )  # type: ignore
+
     # --- Blade Geometry ---
     beta_hub: FloatProperty(
         name="Hub Pitch (deg)",
@@ -756,13 +862,11 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         steps = self.get("_camber_steps", 2)
         return round(steps * 0.001, 3)
 
-
     def set_camber(self, value):
         # Clamp to [0.0, 0.05] and snap to nearest 0.001 step (0..50)
         clamped = max(0.0, min(0.05, float(value)))
         steps = round(clamped * 1000.0)
         self["_camber_steps"] = max(0, min(50, steps))
-
 
     camber_steps: IntProperty(
         name="Blade Cupping (Camber)",
@@ -770,12 +874,12 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         default=2,  # 0.002 m
         min=0,
         max=50,  # 0.050 m
-    ) # type: ignore
+    )  # type: ignore
 
     @property
     def camber(self) -> float:
         return round(self.camber_steps * 0.001, 3)
-    
+
     # camber: FloatProperty(
     #     name="Blade Cupping (Camber)",
     #     description="Parabolic camber depth across blade chord",
@@ -1042,6 +1146,12 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
         box_cage.prop(self, "include_cage", icon="MESH_CIRCLE")
         if self.include_cage:
             box_cage.prop(self, "grille_style")
+            box_cage.prop(self, "brand_name")
+            if self.brand_name:
+                box_cage.prop(self, "brand_font")
+                if self.brand_font == "CUSTOM":
+                    box_cage.prop(self, "brand_font_file")
+                box_cage.prop(self, "brand_font_size")
             box_cage.prop(self, "tip_clearance")
             box_cage.prop(self, "cage_depth")
             box_cage.prop(self, "cage_dome")
@@ -1110,7 +1220,10 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
 
         # Build central hub
         hub_obj = build_central_hub(
-            context, f"FanHub_{n_blades}Blade", r_hub, self.hub_height
+            context,
+            f"FanHub_{n_blades}Blade",
+            r_hub,
+            self.hub_height,
         )
         hub_obj.parent = rotor_spin_empty
 
@@ -1169,6 +1282,11 @@ class MESH_OT_add_parametric_fan(bpy.types.Operator):
                 spiral_twist_deg=self.spiral_twist_deg,
                 wire_radius=self.wire_diameter * 0.5,
                 rim_width=self.rim_width,
+                brand_name=self.brand_name,
+                brand_font_path=(
+                    self.brand_font_file if self.brand_font == "CUSTOM" else ""
+                ),
+                brand_font_size=self.brand_font_size,
             )
             for part in cage_parts:
                 part.parent = fan_head_empty

@@ -2,8 +2,8 @@
 - [x] add bevels to all knobs
 - [x] add proper icon to menu entry
 - [x] group all generated objects into a collection
-- [ ] remove unnecessary geometry (like caps on cylinders)
-- [ ] change bevel to bevel modifier on motor housing
+- [x] remove unnecessary geometry (like caps on cylinders)
+- [x] (skipped) change bevel to bevel modifier on motor housing
 - [ ] make NURBS resolution a parameter
 - [ ] docs
-- [ ] add text option to brand plate
+- [x] add text option to brand plate (TODO: engraving depth is too deep)
