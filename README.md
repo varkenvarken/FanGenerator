@@ -2,11 +2,21 @@
 
 This add-on generates only fans, yet is should still be safe for work 😂
 
+![Image of a fan generated with this add-on](/fan.png)
+
+
 ## Overview
 
 Table Fan Generator is a Blender add-on that creates a parametric axial desktop fan. It can build a multi-blade rotor, protective front and rear cage, center badge, motor housing, desk stand, materials, and optional animation. Generated parts are placed in a collection named `Axial Fan (N Blades)`.
 
 The add-on targets Blender 5.3 or newer.
+
+I originally intended this to be a commercial add-on but in the end it seemed a little bit too niche to me.
+
+[![ko-fi logo](https://storage.ko-fi.com/cdn/logomarkLogo.png)](https://ko-fi.com/varkenvarken) 
+
+However, if you appreciate this add-on and can afford it, consider [leaving me a tip on Ko-Fi](https://ko-fi.com/varkenvarken).
+
 
 ## Installation
 
