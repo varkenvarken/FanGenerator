@@ -9,10 +9,10 @@ import base64
 bl_info = {
     "name": "Table Fan Generator",
     "author": "Michel Anders",
-    "version": (0, 0, 20261121023252),
+    "version": (0, 0, 20261121024556),
     "blender": (5, 3, 0),
     "location": "View3D > Add > Mesh > Parametric Axial Fan",
-    "description": "Generates a multi-blade NURBS axial fan with protective spiral/concentric cage, desk stand, PBR materials, and cyclic animation",
+    "description": "Generates a multi-blade desktop fan with protective spiral/concentric cage, desk stand, PBR materials, and cyclic animation",
     "category": "Add Mesh",
 }
 
@@ -415,6 +415,7 @@ def build_stand_and_motor(
         radius=neck_r * 1.15,
         depth=col_height,
         location=(0.0, pivot_y, z_base_top + col_height * 0.5),
+        end_fill_type="NOTHING",
     )
     column_obj = context.active_object
     column_obj.name = f"{name}_StandColumn"
